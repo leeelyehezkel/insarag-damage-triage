@@ -1,0 +1,16 @@
+# data, runs and weights are downloaded or produced locally, never committed
+data/roboflow/
+data/images/
+runs/
+release/
+*.pt
+*.npy
+*.safetensors
+# environment and secrets
+.env
+*.key
+.venv/
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/
+.DS_Store

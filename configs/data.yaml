@@ -1,0 +1,26 @@
+# Public Roboflow sources of the dataset. A free Roboflow account's API key is needed to download
+# (set ROBOFLOW_API_KEY in the environment; the notebooks ask for it otherwise).
+workspace: leeely-campus-technion-ac-il
+sources:
+  original:            # the 1,050 crops of the original labelled dataset, un-stretched export
+    project: worksite-triage-post-crop-datase
+    version: 2
+  al_labels:           # active-learning rounds 1–10 and the bulk-labelled rest of the pool
+    project: damage-level-classification
+    version: 10
+  test12:              # blind re-labels of test 1 and the random test set 2
+    project: blind-relabel-2
+    version: 1
+  test3:               # the final, blind-labelled test set 3
+    project: blind-test3
+    version: 1
+  detection_gt:        # 361 photos with hand-corrected building boxes and A–F grades (255 / 54 / 52), COCO export;
+    project: disaster-scene-cvat-box-repair   # used to choose the SAM 3 prompts and thresholds (notebook 00)
+    version: 2
+  pool_photos:         # uncropped photos with building boxes, from which the pool crops were cut
+    project: damage-region-dataset
+    version: 1
+
+# The photos and masks are also on Kaggle:
+#   https://www.kaggle.com/datasets/leeelyehezkel/turkey-gt-images
+#   https://www.kaggle.com/datasets/leeelyehezkel/turkey-gt-masks

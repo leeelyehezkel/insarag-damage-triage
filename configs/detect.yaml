@@ -1,0 +1,29 @@
+# Building detection with SAM 3, as used to build the dataset.
+# Prompt search: 20 single phrases + 4 standing-building phrases on 54 validation photos, then 1,350 combinations
+# and ~10,000 threshold / duplicate-removal settings; see notebooks/00_finding_buildings.ipynb.
+model_id: facebook/sam3          # gated on Hugging Face: accept the terms and log in first
+base_confidence: 0.20            # SAM 3 proposal threshold; the per-prompt thresholds below decide what is kept
+prompts:                         # prompt: minimum score
+  building reduced to rubble: 0.60       # total collapse (E–F); debris-like matches need a stricter cut
+  ruins of a collapsed building: 0.55    # collapsed remains (D–F)
+  damaged standing building: 0.50        # standing damage (B–D)
+  building: 0.50                         # intact and other buildings (A–C); added for labelling, where a missed building costs more than an extra box
+nms_iou: 0.40                    # boxes from different prompts overlapping more than this are duplicates (keep the higher score)
+size_filter:                     # relative to the photo, so it works at any resolution
+  min_width: 0.04
+  min_height: 0.05
+  min_area: 0.004
+padding: 0.10                    # added around each box on every side when cropping
+quality:                         # crops failing these are not graded
+  max_aspect: 3.0
+  min_side: 96
+  lum_lo: 0.12
+  lum_hi: 0.90
+  min_std: 0.05
+aerial_filter:                   # used in the study (Qwen 3.5 VL 0.8B via Roboflow); optional here
+  enabled: false
+  prompt: >-
+    Classify the camera viewpoint. Answer with exactly one token: AERIAL or GROUND_LEVEL. AERIAL means captured from
+    a drone, aircraft, rooftop panorama, or a steep top-down high-elevation viewpoint where roofs and a broad urban
+    area dominate. GROUND_LEVEL means a normal street-level or near-ground photograph, including slightly elevated
+    handheld views. Do not classify an image as AERIAL merely because distant buildings are visible.

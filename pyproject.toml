@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insarag-triage"
+version = "0.1.0"
+description = "Ordinal A–F damage triage of single-building crops after earthquakes, with active learning"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "LeeEl Yehezkel" }]
+dependencies = [
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "timm>=1.0.20",          # DINOv3 backbones
+  "numpy",
+  "pandas",
+  "pillow",
+  "scikit-learn",
+  "matplotlib",
+  "pyyaml",
+  "huggingface_hub",
+  "scipy",
+]
+
+[project.optional-dependencies]
+roboflow = ["roboflow"]    # downloading the dataset; active-learning uploads
+detect = ["transformers>=5.0.0"]   # SAM 3 building detection
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
