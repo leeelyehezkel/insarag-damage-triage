@@ -5,7 +5,7 @@ Roboflow project `damage-region-dataset` (object detection, class `damage_region
   2. crop every damage_region box with padding (fraction of box width/height on each side, clipped);
   3. name crops exactly like the labelled set:  <original-photo ID>__image-<image id>__ann-<ann id>.jpg
      so grouping by original photo keeps working;
-  4. EXCLUDE every original photo already present in the labelled dataset (manifest.csv), so no crop of a
+  4. EXCLUDE every original photo already present in the labelled dataset (labelled_manifest), so no crop of a
      val/test photo can ever enter training (leakage) and no already-labelled photo is labelled twice;
   5. write the crops + pool_manifest.csv (to the working directory).
 
@@ -33,15 +33,6 @@ def original_id(file_name: str) -> str:
     return (stripped if stripped != name else Path(name).stem).upper()
 
 
-def download_detection(api_key: str, workspace: str, project: str, version: int, location: Path) -> Path:
-    from roboflow import Roboflow
-    location = Path(location)
-    if not location.exists():
-        Roboflow(api_key=api_key).workspace(workspace).project(project).version(version).download(
-            "coco", location=str(location))
-    return location
-
-
 def iter_coco(root: Path, category: str = "damage_region"):
     """Yield (image_path, image_id, original_id, [x, y, w, h], ann_id) over all export splits."""
     for ann_file in sorted(Path(root).rglob("_annotations.coco.json")):
@@ -63,44 +54,6 @@ def crop_with_padding(img: Image.Image, bbox, pad: float) -> Image.Image:
     W, H = img.size
     box = (max(0, round(x - px)), max(0, round(y - py)), min(W, round(x + w + px)), min(H, round(y + h + py)))
     return img.crop(box)
-
-
-def estimate_padding(coco_root: Path, labelled: pd.DataFrame, category: str = "damage_region",
-                     max_checks: int = 300) -> pd.DataFrame:
-    """Estimate the padding used for the LABELLED crops by matching them to their boxes.
-
-    A labelled crop  <photo>__image-N__ann-M.jpg  is matched to the box with annotation id M in the same
-    photo (falling back to the box whose aspect ratio is closest). Padding per side ≈ (crop − box) / 2 / box,
-    computed separately for width and height. Boxes cut off at the image edge are skipped (padding clipped).
-    """
-    boxes = {}
-    for path, _, group, bbox, ann_id in iter_coco(coco_root, category):
-        boxes.setdefault(group, []).append((ann_id, bbox, path))
-    rows = []
-    for _, r in labelled.head(max_checks * 5).iterrows():
-        if r["group"] not in boxes or len(rows) >= max_checks:
-            continue
-        cands = boxes[r["group"]]
-        cw, ch = Image.open(r["path"]).size
-        exact = [c for c in cands if c[0] == r["ann"]]
-        ann_id, (x, y, w, h), img_path = exact[0] if exact else min(
-            cands, key=lambda c: abs(c[1][2] / c[1][3] - cw / ch))
-        W, H = Image.open(img_path).size
-        if x <= 1 or y <= 1 or x + w >= W - 1 or y + h >= H - 1:
-            continue                                  # touching the edge → padding would be clipped
-        rows.append(dict(file=Path(r["path"]).name, matched="ann-id" if exact else "aspect",
-                         box_w=w, box_h=h, crop_w=cw, crop_h=ch,
-                         pad_w=(cw / w - 1) / 2, pad_h=(ch / h - 1) / 2))
-    est = pd.DataFrame(rows)
-    if est.empty:
-        print("No labelled photo found in the detection dataset — cannot estimate padding.")
-    else:
-        print(f"{len(est)} labelled crops matched ({(est.matched == 'ann-id').mean():.0%} by annotation id). "
-              f"Median padding per side: width {est.pad_w.median():.1%}, height {est.pad_h.median():.1%} "
-              f"(IQR width {est.pad_w.quantile(.25):.1%}–{est.pad_w.quantile(.75):.1%}).")
-        if est.pad_w.median() < -0.02 or est.pad_h.median() < -0.02:
-            print("Crops are SMALLER than their boxes → the labelled crops were probably resized; padding unknown.")
-    return est
 
 
 def build_pool(coco_root: Path, out_dir: Path, labelled_manifest: Path | None, pad: float = 0.10,
@@ -155,47 +108,6 @@ def upload_to_roboflow(paths, api_key: str, workspace: str, project: str, batch_
     if failed:
         print(f"{len(failed)} failed, e.g. {failed[:2]}")
     return failed
-
-
-def near_duplicates(pool: pd.DataFrame, labelled: pd.DataFrame, cfg=None) -> pd.DataFrame:
-    """For every pool crop: the most similar LABELLED crop (cosine similarity of frozen DINOv3 features).
-
-    Used when photo names differ between datasets, to detect the same building/photo appearing in both
-    (a leakage risk if the labelled match is in val/test). Returns one row per pool crop, sorted by similarity.
-    """
-    import numpy as np
-    import torch
-    from . import core as L
-    cfg = cfg or L.Config("dup_check", backbone="dinov3_vits16", mode="frozen", img_size=224)
-    a = torch.nn.functional.normalize(L.embed(cfg, pool["path"]).float(), dim=1)
-    b = torch.nn.functional.normalize(L.embed(cfg, labelled["path"]).float(), dim=1)
-    sim = a @ b.T
-    best, j = sim.max(dim=1)
-    j = j.numpy()
-    out = pool[["file", "path", "group"]].copy()
-    out["max_sim"] = best.numpy()
-    out["match_file"] = labelled["path"].map(lambda p: Path(p).name).to_numpy()[j]
-    out["match_path"] = labelled["path"].to_numpy()[j]
-    out["match_split"] = labelled["split"].to_numpy()[j]
-    out["match_group"] = labelled["group"].to_numpy()[j]
-    return out.sort_values("max_sim", ascending=False).reset_index(drop=True)
-
-
-def show_pairs(dups: pd.DataFrame, n: int = 24, path=None):
-    """Side-by-side pool crop | best labelled match, highest similarity first."""
-    import matplotlib.pyplot as plt
-    from . import core as L
-    rows = dups.head(n)
-    fig, axs = plt.subplots(len(rows), 2, figsize=(5, 2.4 * len(rows)), squeeze=False)
-    for (ax1, ax2), (_, r) in zip(axs, rows.iterrows()):
-        ax1.imshow(L.letterbox(Image.open(r.path), 160)); ax1.set_title(f"POOL {r.file[:22]}", fontsize=6)
-        ax2.imshow(L.letterbox(Image.open(r.match_path), 160))
-        ax2.set_title(f"{r.match_split.upper()} sim={r.max_sim:.3f}", fontsize=7)
-        ax1.axis("off"); ax2.axis("off")
-    fig.tight_layout()
-    if path:
-        fig.savefig(path, dpi=90)
-    return fig
 
 
 def _iou_contain(a, b):

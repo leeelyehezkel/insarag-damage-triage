@@ -130,7 +130,7 @@ def make_transforms(size: int, train: bool, mean=MEAN, std=STD):
         ops += [T.RandomResizedCrop(size, scale=(0.75, 1.0), ratio=(0.9, 1.1)),
                 T.RandomHorizontalFlip(),            # no vertical flip: buildings are upright
                 T.RandomRotation(8),
-                T.ColorJitter(brightness=0.15, contrast=0.15)]  # mild only (Turan 2025: strong jitter hurt)
+                T.ColorJitter(brightness=0.15, contrast=0.15)]  # mild only: strong colour jitter can hide damage cues
     ops += [T.ToTensor(), T.Normalize(mean, std)]          # per-backbone normalisation (SigLIP: 0.5/0.5)
     return T.Compose(ops)
 
@@ -152,7 +152,7 @@ BACKBONES = {
     "dinov2_vits14": ("vit_small_patch14_dinov2.lvd142m", "vit"),
     "dinov2_vitb14": ("vit_base_patch14_dinov2.lvd142m", "vit"),
     "convnextv2_atto": ("convnextv2_atto.fcmae_ft_in1k", "cnn"),
-    # DINOv3 (Siméoni et al. 2025; DINOv3 licence). Patch 16 → use sizes that are multiples of 16
+    # DINOv3 (Siméoni et al. 2025; DINOv3 License). Patch 16 → use sizes that are multiples of 16
     # (224 / 448 / 512). 4 register tokens + CLS; features() skips them via num_prefix_tokens.
     "dinov3_vits16": ("vit_small_patch16_dinov3.lvd1689m", "vit"),            # 21.6M
     "dinov3_vitsplus16": ("vit_small_plus_patch16_dinov3.lvd1689m", "vit"),   # 28.7M
@@ -272,7 +272,9 @@ def evaluate(y_true, y_pred) -> dict:
     }
 
 
-def plot_confusion(m: dict, title: str, path: Path | None = None):
+def plot_confusion(m: dict, title: str, path: Path | None = None, xlabel: str = "Predicted grade",
+                   ylabel: str = "True grade", show_scores: bool = True):
+    """Confusion matrix with counts and row percentages. show_scores adds balanced accuracy and MAE to the title."""
     import matplotlib.pyplot as plt
     cm, cmr = np.array(m["confusion_counts"]), np.array(m["confusion_row_normalised"])
     fig, ax = plt.subplots(figsize=(6.2, 5.4))
@@ -283,11 +285,13 @@ def plot_confusion(m: dict, title: str, path: Path | None = None):
                     fontsize=8, color="white" if np.nan_to_num(cmr[i, j]) > 0.5 else "black")
     ax.set_xticks(range(K), CLASSES)
     ax.set_yticks(range(K), CLASSES)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("True")
-    ax.set_title(f"{title}\nacc(diag/6)={m['overall_accuracy_diag_over_6']:.3f}  "
-                 f"MAE micro={m['mae_overall_micro']:.3f} macro={m['mae_overall_macro']:.3f}", fontsize=9)
-    fig.colorbar(im, ax=ax, fraction=0.046, label="row-normalised")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if show_scores:
+        title = (f"{title}\nbalanced accuracy {m['overall_accuracy_diag_over_6']:.3f} · "
+                 f"MAE {m['mae_overall_micro']:.3f} grades")
+    ax.set_title(title, fontsize=9)
+    fig.colorbar(im, ax=ax, fraction=0.046, label="share of the row")
     fig.tight_layout()
     if path:
         fig.savefig(path, dpi=150)
@@ -499,7 +503,7 @@ def run(cfg: Config, df: pd.DataFrame, seed: int, out_dir: Path, pretrained: boo
         y_te, p_te = _predict(model, test_loader, dev)
 
     m_test = evaluate(y_te, p_te)
-    if cfg.mode == "frozen":   # backbone = unchanged public DINOv2 weights; store only the trained head
+    if cfg.mode == "frozen":   # backbone = unchanged pretrained weights; store only the trained head
         torch.save(model.head.state_dict(), out_dir / "head.pt")
     else:
         torch.save(model.state_dict(), out_dir / "model.pt")
@@ -510,15 +514,3 @@ def run(cfg: Config, df: pd.DataFrame, seed: int, out_dir: Path, pretrained: boo
     (out_dir / "result.json").write_text(json.dumps(result, indent=2))
     plot_confusion(m_test, f"{cfg.name} seed {seed} — TEST", out_dir / "confusion_test.png")
     return result
-
-
-def summarise(results: list[dict]) -> pd.DataFrame:
-    rows = []
-    for r in results:
-        for split in ("val", "test"):
-            m = r[split]
-            rows.append(dict(config=r["config"]["name"], seed=r["seed"], split=split,
-                             acc_diag6=m["overall_accuracy_diag_over_6"], mae_micro=m["mae_overall_micro"],
-                             mae_macro=m["mae_overall_macro"], minutes=r["minutes"]))
-    d = pd.DataFrame(rows)
-    return d.groupby(["config", "split"])[["acc_diag6", "mae_micro", "mae_macro", "minutes"]].agg(["mean", "std"]).round(4)

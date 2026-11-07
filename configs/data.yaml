@@ -5,7 +5,7 @@ sources:
   original:            # the 1,050 crops of the original labelled dataset, un-stretched export
     project: worksite-triage-post-crop-datase
     version: 2
-  al_labels:           # active-learning rounds 1–10 and the bulk-labelled rest of the pool
+  al_labels:           # active-learning rounds 1–9, and round 10 (the AL picks plus the bulk-labelled rest of the pool)
     project: damage-level-classification
     version: 10
   test12:              # blind re-labels of test 1 and the random test set 2
@@ -17,7 +17,7 @@ sources:
   detection_gt:        # 361 photos with hand-corrected building boxes and A–F grades (255 / 54 / 52), COCO export;
     project: disaster-scene-cvat-box-repair   # used to choose the SAM 3 prompts and thresholds (notebook 00)
     version: 2
-  pool_photos:         # uncropped photos with building boxes, from which the pool crops were cut
+  pool_photos:         # uncropped photos with building boxes, from which the pool crops were cut (for reference)
     project: damage-region-dataset
     version: 1
 

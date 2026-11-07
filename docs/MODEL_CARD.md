@@ -19,8 +19,8 @@ Grades a crop of a single building in a post-earthquake street-level photo from 
 - **Weights:** three training seeds (`model_seed*.pt`); predictions are the average over seeds.
 - **Training data:** 1,620 labelled crops from the February 2023 earthquakes in Türkiye.
 - **Intended use:** research on post-earthquake damage assessment and rescue prioritisation. The model hasn't been tested on other events, building types or aerial images. It must not replace an on-site assessment.
-- **Known limits:** most errors are between neighbouring grades. Grades A/B and the D/E boundary are also the least consistent in human labelling.
-- **Licence:** DINOv3 License (`LICENSE-DINOv3.md`). Please cite as given in the repository.
+- **Known limits:** most errors are between neighbouring grades. Grades A and B are also the least consistent in human labelling (a blind re-labelling repeated 42% and 41% of them).
+- **License:** DINOv3 License (`LICENSE-DINOv3.md`, included with the weights). Please cite as given in the repository.
 
 ```python
 from insarag_triage.inference import load_model, predict

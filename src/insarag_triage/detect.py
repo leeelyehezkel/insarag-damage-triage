@@ -221,5 +221,10 @@ def show_detections(photo_path, boxes: pd.DataFrame, gt: pd.DataFrame | None = N
         ax.add_patch(plt.Rectangle((r.x, r.y), r.w, r.h, fill=False, lw=2, color=cmap[r.prompt]))
         ax.text(r.x, r.y, f"{r.score:.2f}", color="white", fontsize=7, va="bottom",
                 bbox=dict(facecolor=cmap[r.prompt], alpha=0.75, pad=1, lw=0))
-    ax.set_title(title or name, fontsize=9)
+    handles = [plt.Line2D([], [], color=cmap[p], lw=3, label=p) for p in names]
+    if gt is not None:
+        handles.append(plt.Line2D([], [], color="white", lw=1.5, ls="--", label="reference box"))
+    if handles:
+        ax.legend(handles=handles, fontsize=7, loc="lower left", framealpha=0.8)
+    ax.set_title(title or f"photo {name[:24]}", fontsize=9)
     return ax

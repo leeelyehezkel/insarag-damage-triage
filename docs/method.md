@@ -4,7 +4,7 @@ This page describes the pipeline from a street-level photo to an A–F grade for
 
 ## 1. Finding and cropping buildings
 
-A single detector trained to find buildings and classify them in one step (RF-DETR) found only 24% of the buildings, so finding and grading were separated. Buildings are found with SAM 3 [Meta AI 2025] using four text prompts, each with its own score threshold:
+A single detector trained to find buildings and classify them in one step (RF-DETR) found only 24% of the buildings, so finding and grading were separated. Buildings are found with SAM 3 [Carion et al. 2025] using four text prompts, each with its own score threshold:
 
 | Prompt | Threshold |
 |---|---|
@@ -45,11 +45,11 @@ Models that differ in pretraining data and objective make more different errors 
 
 **Step 2: typicality.** The score is multiplied by the crop's density: its mean cosine similarity to its 20 nearest neighbours in the pool, using frozen DINOv3 features. This keeps rare outliers from filling the batch [Settles 2012; Kee et al. 2018].
 
-**Step 3: uncertain first, then diverse.** The 500 highest-scoring crops that pass the quality filter are the candidates. They are split into a C/D group (the committee predicts C or D, or the strongest disagreement is at B|C, C|D or D|E) and the rest. The C/D group gets 70 of the 100 places and the rest 30. Within each group the candidates are clustered with k-means into as many clusters as places, and the crop closest to each cluster centre is taken. At most one crop per photo is allowed in a batch. Taking the most uncertain crops first and then spreading the picks over the feature space follows the structure of DropQuery [Gupte et al. 2024] and the typicality idea of TypiClust [Hacohen et al. 2022]. It also avoids the redundant batches that pure top-k uncertainty produces [Kirsch et al. 2019; Ash et al. 2020a; Sener & Savarese 2018].
+**Step 3: uncertain first, then diverse.** The 500 highest-scoring crops that pass the quality filter are the candidates. They are split into a C/D group (the committee predicts C or D, or the strongest disagreement is at B|C, C|D or D|E) and the rest. The C/D group gets 70 of the 100 places and the rest 30. Within each group the candidates are clustered with k-means into as many clusters as places, and the crop closest to each cluster centre is taken. At most one crop per photo is allowed in a batch. Taking the most uncertain crops first and then spreading the picks over the feature space follows the structure of DropQuery [Gupte et al. 2024] and the typicality idea of TypiClust [Hacohen et al. 2022]. It also avoids the redundant batches that pure top-k uncertainty produces [Kirsch et al. 2019; Ash et al. 2020; Sener & Savarese 2018].
 
 **Step 4: labelling.** The 100 crops were uploaded to Roboflow with the committee's grade filled in, and the grades were then corrected by hand.
 
-**Retraining between rounds.** The frozen members are retrained from scratch every round, which takes seconds. To save time, the fine-tuned members continue from the previous round's weights. The head is re-initialised [Nikishin et al. 2022; Kumar et al. 2022], and they train for at most 10 epochs. Because warm-started networks can end up slightly worse than freshly trained ones [Ash & Adams 2020b; Dohare et al. 2024], every third round is trained from scratch. The reported final models are always trained from scratch.
+**Retraining between rounds.** The frozen members are retrained from scratch every round, which takes seconds. To save time, the fine-tuned members continue from the previous round's weights. The head is re-initialised [Nikishin et al. 2022; Kumar et al. 2022], and they train for at most 10 epochs. Because warm-started networks can end up slightly worse than freshly trained ones [Ash & Adams 2020; Dohare et al. 2024], every third round is trained from scratch. The reported final models are always trained from scratch.
 
 ## 4. Test sets
 
@@ -63,10 +63,10 @@ No photo of a test set appears in training. Images are also compared by fingerpr
 
 ## References
 
-- Ash, J. T., & Adams, R. P. (2020b). On warm-starting neural network training. arXiv:1910.08475.
-- Ash, J. T., Zhang, C., Krishnamurthy, A., Langford, J., & Agarwal, A. (2020a). Deep batch active learning by diverse, uncertain gradient lower bounds. arXiv:1906.03671.
+- Ash, J. T., & Adams, R. P. (2020). On warm-starting neural network training. arXiv:1910.08475.
+- Ash, J. T., Zhang, C., Krishnamurthy, A., Langford, J., & Agarwal, A. (2020). Deep batch active learning by diverse, uncertain gradient lower bounds. arXiv:1906.03671.
 - Beluch, W. H., Genewein, T., Nürnberger, A., & Köhler, J. M. (2018). The power of ensembles for active learning in image classification. CVPR, 9368–9377. doi:10.1109/CVPR.2018.00976
-- Meta AI (2025). SAM 3: Segment Anything with Concepts. Model `facebook/sam3`, SAM License. *(full reference to be completed)*
+- Carion, N., et al. (2025). SAM 3: Segment Anything with Concepts. arXiv:2511.16719 (ICLR 2026).
 - Dohare, S., Hernandez-Garcia, J. F., Lan, Q., Rahman, P., Mahmood, A. R., & Sutton, R. S. (2024). Loss of plasticity in deep continual learning. Nature, 632, 768–774. doi:10.1038/s41586-024-07711-7
 - Freund, Y., Seung, H. S., Shamir, E., & Tishby, N. (1997). Selective sampling using the query by committee algorithm. Machine Learning, 28, 133–168. doi:10.1023/A:1007330508534
 - Geirhos, R., et al. (2021). Partial success in closing the gap between human and machine vision. arXiv:2106.07411.

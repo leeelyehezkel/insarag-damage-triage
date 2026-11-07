@@ -26,7 +26,7 @@ See [`docs/labelling_guideline.md`](docs/labelling_guideline.md) for the full de
 | [`04_active_learning`](notebooks/04_active_learning.ipynb) | the committee and the batch selection; can replay the study's rounds on the public data, against random selection |
 | [`05_final_results`](notebooks/05_final_results.ipynb) | final training of all five models, the model choice, test 3, standing vs collapsed, the learning curve |
 
-All notebooks run on Google Colab with a T4 GPU.
+The notebooks are written for Google Colab with a T4 GPU.
 
 ## Install
 
@@ -50,15 +50,15 @@ The crops and labels are public on Roboflow. [`configs/data.yaml`](configs/data.
 | validation | 384 | 169 original + 215 from the active-learning pool (split by photo) |
 | test 1 | 158 | original test split |
 | test 2 | 193 | random crops, labelled blind; used during development |
-| test 3 | 250 drawn | random crops, labelled blind; final evaluation only (2 duplicate photos removed) |
+| test 3 | 152 | random crops, labelled blind; final evaluation only (250 drawn, 154 gradeable, 2 duplicate photos removed) |
 
 No photo appears in both training and a test set. Identical pictures stored under different names were found with image fingerprints and removed (see `insarag_triage.leakage`).
 
 ## Results
 
-**Finding buildings (SAM 3).** Scores are from 52 test photos with 155 hand-drawn buildings, using one-to-one matching at IoU ≥ 0.5. Precision was 0.82 and recall 0.39. Recall was 0.74 for grade C and 0.41 for grade D. Many strict "misses" are one box drawn around a rubble field that the reference splits into several buildings. Counting a building as found when half of it is covered, validation recall is 0.71 instead of 0.45. See notebook 00.
+**Finding buildings (SAM 3).** Scores are from 52 test photos with 155 hand-drawn buildings, using one-to-one matching at IoU ≥ 0.5. Precision was 0.82 and recall 0.39; recall was 0.74 for grade C and 0.41 for grade D. Many strict "misses" are one box drawn around a rubble field that the reference splits into several buildings. On the validation photos, strict recall was 0.45; counting a building as found when half of it is covered, it was 0.71. See notebook 00.
 
-**Grading (DINOv3 ViT-S/16, fine-tuned, 3 seeds averaged).** The model was chosen on validation data before test 3 was opened. Test 3 has 152 gradeable crops, blind labels, and was used once:
+**Grading (DINOv3 ViT-S/16, fine-tuned, 3 seeds averaged).** The model was chosen before test 3 was opened, on validation and test-2 C/D accuracy (see the deviation in `docs/protocol.md`). Test 3 has 152 gradeable crops, blind labels, and was used once:
 
 | Measure | Test 3 |
 |---|---|
@@ -78,7 +78,7 @@ Labels are not perfectly repeatable. Re-labelling the test-1 crops blind gave th
 configs/      data sources, SAM 3 prompts and thresholds
 data/         label manifest (images are downloaded, not stored here)
 docs/         labelling guideline, method, protocol, model card
-licenses/     licence texts of this code and of the models it builds on
+licenses/     license texts of this code and of the models it builds on
 notebooks/
 scripts/      predict.py, export_model.py, export_manifests.py
 src/insarag_triage/
